@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 where py >nul 2>nul
 if errorlevel 1 (
-  echo Instale Python 3.12 com Tcl/Tk pelo site python.org e tente novamente.
+  echo Install Python 3.12 with Tcl/Tk from python.org and try again.
   pause
   exit /b 1
 )
@@ -13,10 +13,10 @@ if not exist ".venv\Scripts\python.exe" (
 )
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 goto :failed
-echo Instalacao concluida. Abra Abrir.cmd para iniciar.
+echo Installation complete. Open Open.cmd to start.
 pause
 exit /b 0
 :failed
-echo A instalacao falhou. Confira as mensagens acima.
+echo Installation failed. Check the messages above.
 pause
 exit /b 1

@@ -22,8 +22,8 @@ def parse_layout(rows,matrix_rows,matrix_cols):
             elif isinstance(item,str):
                 coordinate=item.split('\n')[0]
                 r,c=map(int,coordinate.split(','))
-                if not 0<=r<matrix_rows or not 0<=c<matrix_cols: raise ValueError('Tecla fora da matriz VIA.')
+                if not 0<=r<matrix_rows or not 0<=c<matrix_cols: raise ValueError('Key is outside the VIA matrix.')
                 keys.append(Key(r,c,x,y,w,h));x+=w;w=h=1
         y+=1
-    if len({(key.row,key.col) for key in keys})!=len(keys): raise ValueError('Coordenadas VIA repetidas.')
+    if len({(key.row,key.col) for key in keys})!=len(keys): raise ValueError('Duplicate VIA coordinates.')
     return keys

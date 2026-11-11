@@ -20,7 +20,7 @@ def load_media(path):
     with Image.open(path) as source:
         # Animated files other than GIF use their first frame in this version.
         count=getattr(source,'n_frames',1) if source.format=='GIF' else 1
-        if count>1000: raise ValueError('GIF muito longo. Use um arquivo com até 1000 quadros.')
+        if count>1000: raise ValueError('GIF too long. Use a file with at most 1000 frames.')
         if count==1: return Media([fit_frame(source)],None,1)
         ends=[];durations=[];total=0
         for index in range(count):

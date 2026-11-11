@@ -19,15 +19,15 @@ class Device:
     def __exit__(self,*args): self.handle.close()
 
     def transact(self,request,timeout=3):
-        if self.handle.write(request)!=len(request): raise OSError('Envio USB incompleto.')
+        if self.handle.write(request)!=len(request): raise OSError('Incomplete USB write.')
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
             response=bytes(self.handle.read(64,100))
             if matches_response(request,response):
                 if request[3]!=5 and response[7] in (0xfe,0xff):
-                    raise OSError(f'Teclado recusou o comando {request[3]:02x}: {response.hex()}')
+                    raise OSError(f'Keyboard rejected command {request[3]:02x}: {response.hex()}')
                 return response
-        raise TimeoutError(f'Sem confirmação USB para o comando {request[3]:02x}. Transferência interrompida.')
+        raise TimeoutError(f'No USB acknowledgement for command {request[3]:02x}. Transfer stopped.')
 
     def read_config(self):
         return b''.join(self.transact(config_query(offset))[4:8] for offset in range(0,48,4))
@@ -38,16 +38,16 @@ class Device:
 
 def upload(exchange,original,frame,progress):
     config=photo_config(original)
-    if len(frame)!=65536: raise ValueError('Quadro de imagem inválido.')
+    if len(frame)!=65536: raise ValueError('Invalid image frame.')
     _upload(exchange,config,frame+frame,progress)
 
 def write_config(exchange,config):
-    if len(config)!=48: raise ValueError('Configuração inválida.')
+    if len(config)!=48: raise ValueError('Invalid configuration.')
     exchange(1);exchange(6,config);exchange(2)
 
 def upload_animation(exchange,original,frames,delay_ms,progress):
     config=animation_config(original,len(frames),delay_ms)
-    if any(len(frame)!=65536 for frame in frames): raise ValueError('Quadro de imagem inválido.')
+    if any(len(frame)!=65536 for frame in frames): raise ValueError('Invalid image frame.')
     data=b''.join(frames)
     _upload(exchange,config,data+data,progress)
 

@@ -20,7 +20,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_capture_import_accepts_successful_reads_only(self):
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);archive=root/'registros-iluminacao';archive.mkdir()
+            root=Path(folder);archive=root/'logs-lighting';archive.mkdir()
             config=bytearray(48);config[1:4]=bytes([8,9,7])
             (archive/'good.json').write_text(json.dumps({'status':'snapshot_saved','configuration':config.hex()}))
             config[1]=250
@@ -35,11 +35,11 @@ class CatalogTests(unittest.TestCase):
             with self.assertRaises(ValueError): observe_configuration(root,bytes(47))
             config=bytearray(48);config[2]=255
             with self.assertRaises(ValueError): observe_configuration(root,bytes(config))
-            self.assertFalse((root/'catalogo-iluminacao.json').exists())
+            self.assertFalse((root/'lighting-catalog.json').exists())
 
     def test_catalog_device_identity_and_bounds_are_validated(self):
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);path=root/'catalogo-iluminacao.json'
+            root=Path(folder);path=root/'lighting-catalog.json'
             catalog=load_catalog(root);catalog['effects']=[256]
             path.write_text(json.dumps(catalog))
             with self.assertRaises(ValueError): load_catalog(root)
@@ -51,4 +51,4 @@ class CatalogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);config=bytearray(48);config[2]=9;config[5:10]=bytes.fromhex('00 35 ff 00 0c')
             _,name=observe_configuration(root,bytes(config))
-            self.assertEqual(name,'Verde')
+            self.assertEqual(name,'Green')

@@ -1,10 +1,10 @@
-# Referências e dependências
+# References and dependencies
 
-- **gmk87-node**, Edgar Pérez: referência do protocolo de tela e configuração nativa. O aviso MIT original é preservado em [REFERENCIA-LICENSE.txt](REFERENCIA-LICENSE.txt).
-- **gmk87-usb-reverse** e **GMK87-Tool**: referências de engenharia reversa e do controle RGB. Links no README e no mapa de iluminação.
-- **QMK/VIA**: referência do protocolo público de keymap. A implementação Python usa mensagens HID; não inclui o firmware QMK nem altera o firmware do teclado.
-- **Pillow** e **hidapi**: dependências instaladas pelos respectivos pacotes, com seus próprios avisos e licenças. Este repositório não redistribui os binários particulares usados no ambiente de desenvolvimento.
-- **EPOMAKER**: marca e manual pertencem aos respectivos titulares. O app abre a página oficial do manual; o PDF do fabricante não é redistribuído aqui. `via-definition.json` é a definição do layout fornecida para o dispositivo.
-- **GIF de exemplo**: arte gerada com imagegen e montada para a tela de 240 × 135. Mascote inspirado em Clawd; este projeto não é afiliado à Anthropic.
+- **gmk87-node**, Edgar Pérez: reference for the screen protocol and native configuration. The original MIT notice is kept in [REFERENCE-LICENSE.txt](REFERENCE-LICENSE.txt).
+- **gmk87-usb-reverse** and **GMK87-Tool**: reverse-engineering references and RGB control. Links are in the README and the lighting map.
+- **QMK/VIA**: reference for the public keymap protocol. The Python implementation uses HID messages; it does not include QMK firmware or change the keyboard's firmware.
+- **Pillow** and **hidapi**: dependencies installed by their own packages, with their own notices and licenses. This repository does not redistribute the private binaries used in the development environment.
+- **EPOMAKER**: the brand and manual belong to their respective owners. The app opens the official manual page; the manufacturer's PDF is not redistributed here. `via-definition.json` is the layout definition supplied for the device.
+- **Sample GIF**: artwork generated with imagegen and assembled for the 240 × 135 screen. Mascot inspired by Clawd; this project is not affiliated with Anthropic.
 
-A licença MIT do projeto não substitui as licenças de dependências ou direitos de marcas de terceiros.
+The project's MIT license does not replace the licenses of dependencies or third-party trademark rights.

@@ -41,11 +41,11 @@ class ViaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.object(via,'__file__',str(Path(folder)/'via.py')):
             device=ViaDevice();device.trace=[{'command':4}];device.save_trace()
             device.trace=[{'command':8}];device.save_trace()
-            traces=[json.loads(file.read_text()) for file in (Path(folder)/'registros-via').glob('*.json')]
+            traces=[json.loads(file.read_text()) for file in (Path(folder)/'logs-via').glob('*.json')]
             self.assertEqual(len(traces),2)
             self.assertIn([{'command':4}],traces)
             self.assertIn([{'command':8}],traces)
-            self.assertEqual(json.loads((Path(folder)/'diagnostico-via.json').read_text()),[{'command':8}])
+            self.assertEqual(json.loads((Path(folder)/'diagnostic-via.json').read_text()),[{'command':8}])
 
     def test_legacy_lighting_reads_real_values_and_ignores_channel_echoes(self):
         def exchange(command,data=b'',prefix=None):

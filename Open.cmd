@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (
-  echo Execute Instalar.cmd antes de abrir o app.
+  echo Run Install.cmd before opening the app.
   pause
   exit /b 1
 )

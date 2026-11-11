@@ -11,9 +11,9 @@ MAX_NATIVE_BRIGHTNESS=9  # Observed on this TH80; reference protocol agrees.
 NATIVE_EFFECTS=(1,3,13,16)
 NATIVE_SPEEDS=(2,4)
 NATIVE_COLORS={
-    'Verde-amarelado':bytes.fromhex('00 68 ff 00 0b'),
-    'Verde':bytes.fromhex('00 35 ff 00 0c'),
-    'Arco-íris':bytes.fromhex('ff ff 01 00 00'),
+    'Yellow-green':bytes.fromhex('00 68 ff 00 0b'),
+    'Green':bytes.fromhex('00 35 ff 00 0c'),
+    'Rainbow':bytes.fromhex('ff ff 01 00 00'),
 }  # Exact bytes 5..9 captured on this TH80; do not infer arbitrary color IDs.
 from protocol import config_query, matches_response, select_device
 from protocol import encode_frame, photo_config, animation_config, clock_config, display_config
@@ -32,7 +32,7 @@ def read_via(layer,progress):
     try:
         with ViaDevice() as device:
             count=device.layer_count()
-            if not 0<=layer<count: raise ValueError('Camada não disponível neste teclado.')
+            if not 0<=layer<count: raise ValueError('Layer not available on this keyboard.')
             keys={}
             if device.version>=8:
                 rows=DEFINITION['matrix']['rows'];cols=DEFINITION['matrix']['cols']
@@ -41,34 +41,34 @@ def read_via(layer,progress):
             else:
                 for index,key in enumerate(KEY_LAYOUT):
                     keys[f'{key.row},{key.col}']=get_keycode(device.exchange,layer,key.row,key.col)
-                    progress(f'Lendo teclas: {index+1}/{len(KEY_LAYOUT)}')
+                    progress(f'Reading keys: {index+1}/{len(KEY_LAYOUT)}')
             result.update(status='via_confirmed',version=device.version,layers=count,keys=keys,lighting=read_lighting(device.exchange),
-                          message=f'Camada {layer+1} lida. Clique em uma tecla para configurar.')
+                          message=f'Layer {layer+1} read. Click a key to configure it.')
     except Exception as exc: result['message']=str(exc)
-    (ROOT/'resultado-via.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'result-via.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def write_key(layer,row,col,old,new):
     result={'timestamp':datetime.now().isoformat(),'status':'error','layer':layer,'row':row,'col':col,'old':old,'new':new}
     try:
-        if (row,col) not in {(key.row,key.col) for key in KEY_LAYOUT}: raise ValueError('Tecla fora do layout do TH80.')
+        if (row,col) not in {(key.row,key.col) for key in KEY_LAYOUT}: raise ValueError('Key is outside the TH80 layout.')
         with ViaDevice() as device:
-            if not 0<=layer<device.layer_count(): raise ValueError('Camada inválida.')
+            if not 0<=layer<device.layer_count(): raise ValueError('Invalid layer.')
             current=get_keycode(device.exchange,layer,row,col,buffered=device.version>=8)
-            if current!=old: raise ValueError('A tecla mudou desde a leitura. Leia a camada novamente antes de aplicar.')
-            backup=ROOT/('tecla-antes-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')
+            if current!=old: raise ValueError('The key changed since it was read. Read the layer again before applying.')
+            backup=ROOT/('key-before-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')
             backup.write_text(json.dumps(result,indent=2),encoding='utf-8')
             set_keycode(device.exchange,layer,row,col,new,buffered=device.version>=8)
-            result.update(status='key_acknowledged',message=f'Tecla alterada: {key_name(old)} para {key_name(new)}. Teste no teclado.')
-            (ROOT/'ultima-tecla.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+            result.update(status='key_acknowledged',message=f'Key changed: {key_name(old)} to {key_name(new)}. Test it on the keyboard.')
+            (ROOT/'last-key.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     except Exception as exc: result['message']=str(exc)
-    (ROOT/'resultado-tecla.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'result-key.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def read_native_lighting():
     with Device() as device: config=device.read_config()
-    if len(config)!=48: raise OSError('Configuração incompleta.')
-    if config[2]>MAX_NATIVE_BRIGHTNESS: raise ValueError('Brilho fora da faixa observada de 0 a 9. Capture os ajustes para análise.')
+    if len(config)!=48: raise OSError('Incomplete configuration.')
+    if config[2]>MAX_NATIVE_BRIGHTNESS: raise ValueError('Brightness outside the observed 0-9 range. Capture the settings for analysis.')
     return {'channel':'native','brightness':config[2],'max_brightness':MAX_NATIVE_BRIGHTNESS,'effect':config[1],'speed':config[3]}
 
 def probe_lighting():
@@ -78,72 +78,72 @@ def probe_lighting():
             lighting=read_lighting(device.exchange)
             result.update(lighting=lighting,version=device.version,
                           status='lighting_confirmed' if lighting else 'lighting_unavailable',
-                          message='Controle de iluminação VIA confirmado.' if lighting else 'O teclado respondeu ao VIA, mas não devolveu valores de iluminação nos formatos consultados (atual e antigo).')
+                          message='VIA lighting control confirmed.' if lighting else 'The keyboard answered VIA but returned no lighting values in the formats queried (current and legacy).')
         if lighting is None:
             native=read_native_lighting()
             if native:
                 result.update(status='lighting_confirmed',lighting=native,
-                              message=f'Brilho: {native["brightness"]}/9 · Efeito: {native["effect"]} · Velocidade: {native["speed"]}. Opções de cor usam os estados capturados.')
+                              message=f'Brightness: {native["brightness"]}/9 · Effect: {native["effect"]} · Speed: {native["speed"]}. Color options use the captured states.')
     except Exception as exc: result['message']=str(exc)
-    (ROOT/'resultado-iluminacao.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'result-lighting.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def capture_lighting(fresh=False,baseline=None):
     """Read the known screen configuration; compare captures without any writes."""
     result={'timestamp':datetime.now().isoformat(),'status':'error'}
     try:
-        latest=ROOT/'captura-iluminacao.json'
+        latest=ROOT/'lighting-capture.json'
         previous=baseline
         if previous is None and not fresh and latest.exists():
             previous=json.loads(latest.read_text(encoding='utf-8'))
         with Device() as device: current=device.read_config()
-        if len(current)!=48: raise OSError('Configuração incompleta.')
+        if len(current)!=48: raise OSError('Incomplete configuration.')
         result.update(status='snapshot_saved',configuration=current.hex(),candidate_changes=[],clock_changes=[],other_changes=[],
-                      message='Antes salvo. Mude somente um ajuste no teclado e clique em 2 · Capturar depois.')
+                      message='Before saved. Change only one setting on the keyboard and click 2 · Capture after.')
         if previous:
             before=bytes.fromhex(previous['configuration'])
-            if len(before)!=48: raise ValueError('Captura anterior inválida.')
+            if len(before)!=48: raise ValueError('Invalid previous capture.')
             changes=[{'offset':i,'before':a,'after':b} for i,(a,b) in enumerate(zip(before,current)) if a!=b]
             result.update(status='comparison_saved',previous_timestamp=previous['timestamp'],
                           candidate_changes=[item for item in changes if item['offset']<33],
                           clock_changes=[item for item in changes if 35<=item['offset']<=41],
                           other_changes=[item for item in changes if item['offset']>=33 and not 35<=item['offset']<=41])
             count=len(result['candidate_changes'])
-            result['message']=f'Capturas comparadas: {count} campo(s) anterior(es) à área da tela mudaram. Registro salvo para análise.'
+            result['message']=f'Captures compared: {count} field(s) before the screen area changed. Log saved for analysis.'
         content=json.dumps(result,ensure_ascii=False,indent=2)
-        archive=ROOT/'registros-iluminacao';archive.mkdir(exist_ok=True)
+        archive=ROOT/'logs-lighting';archive.mkdir(exist_ok=True)
         (archive/(datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')).write_text(content,encoding='utf-8')
         latest.write_text(content,encoding='utf-8')
     except Exception as exc: result['message']=str(exc)
-    (ROOT/'resultado-captura-iluminacao.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'result-lighting-capture.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def learn_native_lighting():
     with Device() as device: config=device.read_config()
     catalog,name=observe_configuration(ROOT,config)
-    return {'status':'catalog_saved','catalog':catalog,'message':f'Estado registrado: efeito {config[1]}, velocidade {config[3]}, cor {name}.'}
+    return {'status':'catalog_saved','catalog':catalog,'message':f'State recorded: effect {config[1]}, speed {config[3]}, color {name}.'}
 
 def apply_native_brightness(brightness,effect=None,speed=None,color_preset=None,custom_color=None):
     result={'timestamp':datetime.now().isoformat(),'status':'error','channel':'native','brightness':brightness}
     try:
         catalog=load_catalog(ROOT)
         if type(brightness) is not int or not 0<=brightness<=MAX_NATIVE_BRIGHTNESS:
-            raise ValueError('Use um nível inteiro de brilho entre 0 e 9: dez níveis neste TH80.')
+            raise ValueError('Use a whole brightness level from 0 to 9: ten levels on this TH80.')
         if effect is not None and (type(effect) is not int or effect not in catalog['effects']):
-            raise ValueError('Escolha um efeito registrado neste TH80.')
+            raise ValueError('Choose an effect recorded on this TH80.')
         if speed is not None and (type(speed) is not int or speed not in catalog['speeds']):
-            raise ValueError('Escolha uma velocidade registrada neste TH80.')
+            raise ValueError('Choose a speed recorded on this TH80.')
         if color_preset is not None and color_preset not in catalog['colors']:
-            raise ValueError('Escolha uma das cores capturadas neste TH80.')
+            raise ValueError('Choose one of the colors captured on this TH80.')
         if custom_color is not None:
             custom_color=normalize_hex(custom_color)
-            if color_preset is not None: raise ValueError('Escolha uma cor personalizada ou um estado capturado.')
+            if color_preset is not None: raise ValueError('Choose either a custom color or a captured state.')
         with Device() as device:
             original=device.read_config()
-            if len(original)!=48: raise OSError('Configuração incompleta.')
-            if original[2]>MAX_NATIVE_BRIGHTNESS: raise ValueError('Brilho atual fora da faixa observada. Capture os ajustes antes de aplicar.')
+            if len(original)!=48: raise OSError('Incomplete configuration.')
+            if original[2]>MAX_NATIVE_BRIGHTNESS: raise ValueError('Current brightness is outside the observed range. Capture the settings before applying.')
             result['configuration_before']=original.hex()
-            (ROOT/('luz-antes-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')).write_text(json.dumps(result,indent=2),encoding='utf-8')
+            (ROOT/('light-before-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')).write_text(json.dumps(result,indent=2),encoding='utf-8')
             desired=bytearray(original);desired[2]=brightness;fields={2}
             if effect is not None: desired[1]=effect;fields.add(1)
             if speed is not None: desired[3]=speed;fields.add(3)
@@ -153,13 +153,13 @@ def apply_native_brightness(brightness,effect=None,speed=None,color_preset=None,
                 desired=bytearray(rgb_configuration(desired,custom_color));fields.update(range(5,9))
             write_config(device.exchange,bytes(desired))
             current=device.read_config();result['configuration_after']=current.hex()
-            if len(current)!=48 or any(current[i]!=desired[i] for i in fields): raise OSError('O ajuste de iluminação não foi confirmado na leitura final.')
+            if len(current)!=48 or any(current[i]!=desired[i] for i in fields): raise OSError('The lighting change was not confirmed by the final read.')
             if any(current[i]!=original[i] for i in range(48) if i not in fields and not 35<=i<=41):
-                raise OSError('O brilho foi lido, mas outro ajuste também mudou. Confira o registro antes de continuar.')
+                raise OSError('Brightness was read back, but another setting also changed. Check the log before continuing.')
             result.update(status='lighting_acknowledged',effect=current[1],speed=current[3],color_preset=color_preset,custom_color=custom_color,
-                          message=f'Iluminação confirmada: brilho {brightness}, efeito {current[1]}, velocidade {current[3]}. Confira no teclado.')
+                          message=f'Lighting confirmed: brightness {brightness}, effect {current[1]}, speed {current[3]}. Check the keyboard.')
     except Exception as exc: result['message']=str(exc)
-    (ROOT/'resultado-iluminacao.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'result-lighting.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def apply_lighting(brightness,color,channel=None,effect=None,speed=None,color_preset=None,custom_color=None):
@@ -169,17 +169,17 @@ def apply_lighting(brightness,color,channel=None,effect=None,speed=None,color_pr
     try:
         with ViaDevice() as device:
             current=read_lighting(device.exchange)
-            if current is None: raise ValueError('O firmware não expõe iluminação pelo VIA.')
+            if current is None: raise ValueError('The firmware does not expose lighting over VIA.')
             result['before']=current
-            (ROOT/('luz-antes-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')).write_text(json.dumps(result,indent=2),encoding='utf-8')
+            (ROOT/('light-before-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')).write_text(json.dumps(result,indent=2),encoding='utf-8')
             hue=saturation=None
             if current['channel']!=1:
                 rgb=[int(color[i:i+2],16)/255 for i in (1,3,5)]
                 h,s,_=colorsys.rgb_to_hsv(*rgb);hue=round(h*255);saturation=round(s*255)
             write_lighting(device.exchange,current['channel'],brightness,hue,saturation)
-            result.update(status='lighting_acknowledged',message='Iluminação aplicada. A cor depende do efeito ativo no teclado.')
+            result.update(status='lighting_acknowledged',message='Lighting applied. The color depends on the effect active on the keyboard.')
     except Exception as exc: result['message']=str(exc)
-    (ROOT/'resultado-iluminacao.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (ROOT/'result-lighting.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def send_photo(frame,progress,delay_ms=None):
@@ -189,7 +189,7 @@ def send_photo(frame,progress,delay_ms=None):
             original=device.read_config()
             result['configuration_before']=original.hex()
             # Save metadata before any write. This does not back up old images.
-            backup=ROOT/('config-antes-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')
+            backup=ROOT/('config-before-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')
             backup.write_text(json.dumps(result,indent=2),encoding='utf-8')
             if delay_ms is None:
                 upload(device.exchange,original,frame,progress)
@@ -201,13 +201,13 @@ def send_photo(frame,progress,delay_ms=None):
             result['configuration_after']=current.hex()
             fields=(33,34,46) if delay_ms is None else (33,34,43,44,46)
             if any(current[i]!=expected[i] for i in fields):
-                raise OSError('Dados enviados, mas o modo da foto não foi confirmado na leitura final.')
+                raise OSError('Data sent, but the photo mode was not confirmed by the final read.')
             result['status']='upload_acknowledged'
-            result['message']='Transferência confirmada pelo teclado. Confira a foto na tela!'
+            result['message']='Transfer confirmed by the keyboard. Check the screen!'
     except Exception as exc:
-        result['message']=str(exc)+' O envio não foi confirmado; as imagens podem ter sido alteradas parcialmente.'
+        result['message']=str(exc)+' The upload was not confirmed; the images may have been partly changed.'
     finally:
-        (ROOT/'resultado-envio.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+        (ROOT/'result-upload.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def set_screen(mode):
@@ -216,23 +216,23 @@ def set_screen(mode):
         with Device() as device:
             original=device.read_config()
             result['configuration_before']=original.hex()
-            backup=ROOT/('config-antes-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')
+            backup=ROOT/('config-before-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.json')
             backup.write_text(json.dumps(result,indent=2),encoding='utf-8')
             now=datetime.now()  # Time of this Windows PC, including its local timezone.
             config=clock_config(original,now) if mode=='clock' else display_config(original,1)
             write_config(device.exchange,config)
             current=device.read_config()
             result['configuration_after']=current.hex()
-            if current[33]!=config[33]: raise OSError('O modo da tela não foi confirmado.')
+            if current[33]!=config[33]: raise OSError('The screen mode was not confirmed.')
             if mode=='clock' and current[39:42]!=config[39:42]:
-                raise OSError('A data do relógio não foi confirmada.')
+                raise OSError('The clock date was not confirmed.')
             result['status']='configuration_acknowledged'
-            result['message']=(f'Relógio ajustado para {now:%d/%m/%Y %H:%M:%S}. Confira a tela!'
-                               if mode=='clock' else 'Modo de imagem confirmado. Confira a tela!')
+            result['message']=(f'Clock set to {now:%d/%m/%Y %H:%M:%S}. Check the screen!'
+                               if mode=='clock' else 'Image mode confirmed. Check the screen!')
     except Exception as exc:
-        result['message']=str(exc)+' A alteração não foi confirmada.'
+        result['message']=str(exc)+' The change was not confirmed.'
     finally:
-        (ROOT/'resultado-relogio.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+        (ROOT/'result-clock.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 def probe(progress):
@@ -243,12 +243,12 @@ def probe(progress):
             'responses':[], 'configuration_hex':None}
     handle=None
     try:
-        progress('Localizando a interface da tela…')
+        progress('Looking for the screen interface…')
         device=select_device(devices)
         handle=hid.device()
         handle.open_path(device['path'])
         result['product']=handle.get_product_string()
-        progress('Teclado encontrado. Consultando a configuração…')
+        progress('Keyboard found. Reading the configuration…')
         # Drain stale input without emitting any output reports.
         for _ in range(10):
             if not handle.read(64,20): break
@@ -256,7 +256,7 @@ def probe(progress):
         for offset in range(0,48,4):
             packet=config_query(offset)
             written=handle.write(packet)
-            if written!=len(packet): raise OSError('Consulta USB incompleta.')
+            if written!=len(packet): raise OSError('Incomplete USB query.')
             deadline=time.monotonic()+2
             matched=None
             while time.monotonic()<deadline:
@@ -267,19 +267,19 @@ def probe(progress):
                     matched=response
                     break
             if matched is None:
-                raise TimeoutError(f'Teclado encontrado, mas a consulta no offset {offset} não teve resposta confirmada. O envio permanece bloqueado.')
+                raise TimeoutError(f'Keyboard found, but the query at offset {offset} got no confirmed reply. Uploading stays blocked.')
             config.extend(matched[4:8])
-            progress(f'Consultando configuração: {offset+4}/48 bytes')
+            progress(f'Reading configuration: {offset+4}/48 bytes')
         result['configuration_hex']=config.hex()
         result['status']='query_confirmed'
-        result['message']='Conexão e consulta confirmadas. Nenhuma configuração foi alterada.'
+        result['message']='Connection and query confirmed. No settings were changed.'
     except Exception as exc:
         result['message']=str(exc)
     finally:
         if handle is not None:
             try: handle.close()
             except Exception: pass
-        (ROOT/'resultado-conexao.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+        (ROOT/'result-connection.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result
 
 class App:
@@ -306,7 +306,7 @@ class App:
         try: self.refresh_catalog(import_captures(ROOT))
         except (OSError,ValueError) as exc: catalog_error=str(exc)
         try:
-            saved=json.loads((ROOT/'ultima-tecla.json').read_text(encoding='utf-8'))
+            saved=json.loads((ROOT/'last-key.json').read_text(encoding='utf-8'))
             if saved.get('status')=='key_acknowledged': self.last_key=saved
         except (OSError,ValueError): pass
         self.root.protocol('WM_DELETE_WINDOW',self.close)
@@ -323,7 +323,7 @@ class App:
         self.pages[page].pack(fill='both',expand=True)
         for name,button in self.nav_buttons.items():
             button.configure(bg=C['panel'] if name==page else C['side'],fg=C['blue'] if name==page else C['muted'])
-        self.heading.set({'images':'Tela e GIF','clock':'Relógio','keys':'Teclas','lighting':'Iluminação','manual':'Manual'}[page])
+        self.heading.set({'images':'Screen & GIF','clock':'Clock','keys':'Keys','lighting':'Lighting','manual':'Manual'}[page])
 
     def tick_clock(self):
         now=datetime.now()
@@ -346,12 +346,12 @@ class App:
         if self.busy: return
         layer=int(self.layer.get().split()[-1])-1
         self.viadata=None
-        self.task('via',lambda:read_via(layer,lambda text:self.events.put(('progress',text))),'Consultando VIA… Feche outros configuradores do teclado.')
+        self.task('via',lambda:read_via(layer,lambda text:self.events.put(('progress',text))),'Querying VIA… Close other keyboard configurators.')
 
     def load_light(self):
         if self.busy: return
         self.light_data=None
-        self.task('light-probe',probe_lighting,'Consultando somente a iluminação VIA…')
+        self.task('light-probe',probe_lighting,'Querying VIA lighting only…')
 
     def select_key(self,position):
         if self.busy: return
@@ -359,9 +359,9 @@ class App:
         self.keyboard_view.selected=position;self.keyboard_view.draw()
         if self.viadata:
             code=self.viadata['keys'][f'{position[0]},{position[1]}']
-            self.key_info.set(f'Camada {self.viadata["layer"]+1} • tecla {position[0]},{position[1]} • atual: {key_name(code)}')
+            self.key_info.set(f'Layer {self.viadata["layer"]+1} • key {position[0]},{position[1]} • current: {key_name(code)}')
             self.new_key.set(key_name(code) if code in KEYCODES else 'A')
-        else: self.key_info.set('Leia a camada antes de editar esta tecla.')
+        else: self.key_info.set('Read the layer before editing this key.')
         self.update_buttons()
 
     def apply_key(self):
@@ -370,24 +370,24 @@ class App:
         if self.new_key.get() not in choices: return
         row,col=self.selected_key;layer=self.viadata['layer']
         old=self.viadata['keys'][f'{row},{col}'];new=choices[self.new_key.get()]
-        if old==new: self.status.set('Essa tecla já usa a função escolhida.');return
-        self.task('key',lambda:write_key(layer,row,col,old,new),'Aplicando somente a tecla selecionada…')
+        if old==new: self.status.set('That key already uses the chosen function.');return
+        self.task('key',lambda:write_key(layer,row,col,old,new),'Applying only the selected key…')
 
     def undo_key(self):
         if self.busy or not self.last_key: return
         change=self.last_key.copy()
-        self.task('undo',lambda:write_key(change['layer'],change['row'],change['col'],change['new'],change['old']),'Restaurando a última tecla alterada…')
+        self.task('undo',lambda:write_key(change['layer'],change['row'],change['col'],change['new'],change['old']),'Restoring the last changed key…')
 
     def refresh_catalog(self,catalog):
         self.native_effects=catalog['effects'];self.native_speeds=catalog['speeds']
         self.native_colors={name:bytes.fromhex(block) for name,block in catalog['colors'].items()}
         if hasattr(self,'effect_input'):
-            self.effect_input.configure(values=['Manter atual']+[f'Efeito {n}' for n in self.native_effects])
-            self.speed_input.configure(values=['Manter atual']+[f'Nível {n}' for n in self.native_speeds])
-            self.native_color_input.configure(values=['Manter atual','Cor personalizada']+list(self.native_colors))
+            self.effect_input.configure(values=['Keep current']+[f'Effect {n}' for n in self.native_effects])
+            self.speed_input.configure(values=['Keep current']+[f'Level {n}' for n in self.native_speeds])
+            self.native_color_input.configure(values=['Keep current','Custom color']+list(self.native_colors))
 
     def learn_light(self):
-        self.task('light-learn',learn_native_lighting,'Lendo o estado atual para adicionar ao catálogo…')
+        self.task('light-learn',learn_native_lighting,'Reading the current state to add it to the catalog…')
 
     def pick_color(self):
         if self.busy: return
@@ -397,17 +397,17 @@ class App:
     def choose_color(self,color):
         if self.busy: return
         self.color=color
-        self.color_info.configure(text=f'Cor: {color}',fg=color)
-        if self.light_data and self.light_data['channel']=='native': self.native_color_choice.set('Cor personalizada')
+        self.color_info.configure(text=f'Color: {color}',fg=color)
+        if self.light_data and self.light_data['channel']=='native': self.native_color_choice.set('Custom color')
 
     def capture_light(self):
         before=getattr(self,'capture_before',None)
-        self.task('light-capture',lambda:capture_lighting(fresh=before is None,baseline=before),'Lendo ajustes para comparar a iluminação…')
+        self.task('light-capture',lambda:capture_lighting(fresh=before is None,baseline=before),'Reading settings to compare lighting…')
 
     def open_manual(self):
         import webbrowser
         if not webbrowser.open('https://epomaker.com/blogs/manuals/th80-pro-v2-manual'):
-            messagebox.showinfo('Manual oficial','https://epomaker.com/blogs/manuals/th80-pro-v2-manual',parent=self.root)
+            messagebox.showinfo('Official manual','https://epomaker.com/blogs/manuals/th80-pro-v2-manual',parent=self.root)
 
     def apply_light(self):
         if self.busy or not self.light_data: return
@@ -415,11 +415,11 @@ class App:
         channel=self.light_data['channel']
         effect=speed=color_preset=custom_color=None
         if channel=='native':
-            if self.effect_choice.get()!='Manter atual': effect=int(self.effect_choice.get().split()[-1])
-            if self.speed_choice.get()!='Manter atual': speed=int(self.speed_choice.get().split()[-1])
-            if self.native_color_choice.get()=='Cor personalizada': custom_color=color
-            elif self.native_color_choice.get()!='Manter atual': color_preset=self.native_color_choice.get()
-        self.task('light',lambda:apply_lighting(brightness,color,channel,effect,speed,color_preset,custom_color),'Aplicando iluminação…')
+            if self.effect_choice.get()!='Keep current': effect=int(self.effect_choice.get().split()[-1])
+            if self.speed_choice.get()!='Keep current': speed=int(self.speed_choice.get().split()[-1])
+            if self.native_color_choice.get()=='Custom color': custom_color=color
+            elif self.native_color_choice.get()!='Keep current': color_preset=self.native_color_choice.get()
+        self.task('light',lambda:apply_lighting(brightness,color,channel,effect,speed,color_preset,custom_color),'Applying lighting…')
 
     def animate(self):
         if self.preview_frames:
@@ -450,13 +450,13 @@ class App:
         for combo in (self.effect_input,self.speed_input,self.native_color_input): combo.configure(state='readonly' if native else 'disabled')
         for button in self.color_buttons+[self.color_picker]: button.configure(state='normal' if enabled and (native or 'hue' in lighting) else 'disabled')
         from ui import C
-        self.connection_label.configure(text='●  USB conectado' if self.connected else '●  Aguardando USB',fg=C['blue'] if self.connected else C['muted'])
+        self.connection_label.configure(text='●  USB connected' if self.connected else '●  Waiting for USB',fg=C['blue'] if self.connected else C['muted'])
 
     def change_screen(self,mode):
         if self.busy or not self.connected: return
         self.busy=True;self.update_buttons()
         self.bar.configure(mode='indeterminate');self.bar.start(12)
-        self.status.set('Ajustando relógio…' if mode=='clock' else 'Voltando à imagem salva…')
+        self.status.set('Setting the clock…' if mode=='clock' else 'Returning to the saved image…')
         def worker():
             try: result=set_screen(mode)
             except Exception as exc: result={'status':'error','message':str(exc)}
@@ -465,12 +465,12 @@ class App:
 
     def close(self):
         if self.busy:
-            messagebox.showinfo('Operação em andamento','Aguarde a operação terminar antes de fechar.',parent=self.root)
+            messagebox.showinfo('Operation in progress','Wait for the operation to finish before closing.',parent=self.root)
             return
         self.root.destroy()
 
     def choose(self):
-        path=filedialog.askopenfilename(parent=self.root,title='Escolher foto ou GIF',filetypes=[('Imagens','*.png *.jpg *.jpeg *.webp *.bmp *.gif'),('Todos os arquivos','*.*')])
+        path=filedialog.askopenfilename(parent=self.root,title='Choose a photo or GIF',filetypes=[('Images','*.png *.jpg *.jpeg *.webp *.bmp *.gif'),('All files','*.*')])
         if not path: return
         try:
             media=load_media(path)
@@ -479,14 +479,14 @@ class App:
             self.preview.configure(image=previews[0],text='',width=0,height=0)
             self.delay.set(str(media.delay_ms or 100))
             if media.delay_ms:
-                note=f'GIF: {len(media.frames)} quadros, {media.delay_ms} ms por quadro.'
-                if media.original_count>18: note+=f' Reduzido de {media.original_count} quadros, amostrando o ciclo completo.'
-                if media.variable_timing: note+=' Tempos variáveis foram adaptados a um intervalo fixo.'
-            else: note='Foto estática • 240 × 135 pixels.'
+                note=f'GIF: {len(media.frames)} frames, {media.delay_ms} ms per frame.'
+                if media.original_count>18: note+=f' Reduced from {media.original_count} frames, sampling the full loop.'
+                if media.variable_timing: note+=' Variable frame timings were fitted to one fixed interval.'
+            else: note='Still photo • 240 × 135 pixels.'
             self.media_info.set(note)
             self.update_buttons()
         except Exception as exc:
-            messagebox.showerror('Não foi possível abrir a foto',str(exc),parent=self.root)
+            messagebox.showerror('Couldn\'t open the photo',str(exc),parent=self.root)
 
     def send(self):
         if self.busy or not self.connected or self.media is None: return
@@ -496,12 +496,12 @@ class App:
                 delay=int(self.delay.get())
                 if not 60<=delay<=65535: raise ValueError()
             except ValueError:
-                messagebox.showerror('Intervalo inválido','Use um intervalo inteiro entre 60 e 65535 ms.',parent=self.root);return
-        if not messagebox.askokcancel('Substituir imagens','Enviar esta foto ou animação para as duas posições do teclado?\n\nAs duas imagens atuais serão substituídas. Deixe o cabo conectado até terminar.',parent=self.root): return
+                messagebox.showerror('Invalid interval','Use a whole-number interval from 60 to 65535 ms.',parent=self.root);return
+        if not messagebox.askokcancel('Replace images','Send this photo or animation to both of the keyboard\'s image slots?\n\nBoth current images will be replaced. Keep the cable connected until it finishes.',parent=self.root): return
         self.busy=True
         self.update_buttons()
         self.bar.configure(mode='determinate',value=0)
-        self.status.set('Lendo a configuração e preparando o envio…')
+        self.status.set('Reading the configuration and preparing the upload…')
         media=self.media
         def worker():
             try:
@@ -533,7 +533,7 @@ class App:
                 if kind=='progress': self.status.set(value)
                 elif kind=='percent':
                     self.bar.configure(value=value)
-                    self.status.set(f'Enviando imagem: {value:.0f}% — mantenha o cabo conectado.')
+                    self.status.set(f'Uploading image: {value:.0f}% — keep the cable connected.')
                 else:
                     self.status.set(value['message'])
                     self.bar.stop()
@@ -543,7 +543,7 @@ class App:
                     if kind=='via':
                         if value['status']=='via_confirmed':
                             self.viadata=value
-                            self.layer_input.configure(values=[f'Camada {i+1}' for i in range(value['layers'])])
+                            self.layer_input.configure(values=[f'Layer {i+1}' for i in range(value['layers'])])
                             self.keyboard_view.set_codes(value['keys'])
                             self.hero_keyboard.set_codes(value['keys'])
                             lighting=value.get('lighting')
@@ -551,14 +551,14 @@ class App:
                             if lighting:
                                 self.brightness_input.configure(to=lighting.get('max_brightness',255),resolution=1)
                                 self.brightness.set(lighting['brightness'])
-                                self.light_info.set('Controle VIA detectado. Ajuste o brilho e aplique.')
+                                self.light_info.set('VIA control detected. Set the brightness and apply.')
                                 if 'hue' in lighting:
                                     import colorsys
                                     rgb=colorsys.hsv_to_rgb(lighting['hue']/255,lighting['saturation']/255,1)
                                     self.color='#'+''.join(f'{round(c*255):02x}' for c in rgb)
-                                    self.color_info.configure(text=f'Cor atual: {self.color}',fg=self.color)
+                                    self.color_info.configure(text=f'Current color: {self.color}',fg=self.color)
                             else:
-                                self.light_info.set('Este firmware não oferece iluminação pelos canais VIA padrão. Os controles permanecem desativados; use os atalhos de iluminação do teclado.')
+                                self.light_info.set('This firmware doesn\'t offer lighting on the standard VIA channels. The controls stay disabled; use the keyboard\'s lighting shortcuts.')
                             if self.selected_key: self.select_key(self.selected_key)
                         else:
                             self.viadata=None
@@ -567,10 +567,10 @@ class App:
                         self.light_info.set(value['message'])
                         if value['status']=='snapshot_saved':
                             self.capture_before=value
-                            self.light_capture.configure(text='2 · Capturar depois')
+                            self.light_capture.configure(text='2 · Capture after')
                         elif value['status']=='comparison_saved':
                             self.capture_before=None
-                            self.light_capture.configure(text='1 · Capturar antes')
+                            self.light_capture.configure(text='1 · Capture before')
                     if kind=='light-learn':
                         self.light_info.set(value['message'])
                         if value['status']=='catalog_saved': self.refresh_catalog(value['catalog'])
@@ -585,15 +585,15 @@ class App:
                                 import colorsys
                                 rgb=colorsys.hsv_to_rgb(lighting['hue']/255,lighting['saturation']/255,1)
                                 self.color='#'+''.join(f'{round(c*255):02x}' for c in rgb)
-                                self.color_info.configure(text=f'Cor atual: {self.color}',fg=self.color)
+                                self.color_info.configure(text=f'Current color: {self.color}',fg=self.color)
                     if kind in ('key','undo') and value['status']=='key_acknowledged':
                         self.last_key=value if kind=='key' else None
                         if self.viadata and self.viadata['layer']==value['layer']:
                             self.viadata['keys'][f'{value["row"]},{value["col"]}']=value['new']
                             self.keyboard_view.set_codes(self.viadata['keys']);self.hero_keyboard.set_codes(self.viadata['keys'])
                         if kind=='undo':
-                            (ROOT/'ultima-tecla.json').unlink(missing_ok=True)
-                            self.status.set('Última tecla restaurada. Teste no teclado.')
+                            (ROOT/'last-key.json').unlink(missing_ok=True)
+                            self.status.set('Last key restored. Test it on the keyboard.')
                     self.busy=False
                     self.update_buttons()
                     if kind in ('via','key','undo') and self.viadata and self.selected_key: self.select_key(self.selected_key)

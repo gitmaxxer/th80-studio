@@ -29,7 +29,7 @@ class OperationTests(unittest.TestCase):
 
     def test_invalid_or_conflicting_hex_never_opens_usb(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(app,'ROOT',Path(folder)), patch.object(app,'Device') as device:
-            for color,preset in [('ZZFFFF',None),('#0066FF','Verde')]:
+            for color,preset in [('ZZFFFF',None),('#0066FF','Green')]:
                 self.assertEqual(app.apply_native_brightness(2,color_preset=preset,custom_color=color)['status'],'error')
             device.assert_not_called()
 
@@ -56,16 +56,16 @@ class OperationTests(unittest.TestCase):
     def test_native_color_replays_captured_block_and_preserves_everything_else(self):
         device=SimulatedKeyboard();before=device.config
         with tempfile.TemporaryDirectory() as folder, patch.object(app,'ROOT',Path(folder)), patch.object(app,'Device',lambda:device):
-            result=app.apply_native_brightness(9,color_preset='Verde')
+            result=app.apply_native_brightness(9,color_preset='Green')
             self.assertEqual(result['status'],'lighting_acknowledged')
             self.assertEqual(device.config[5:10],bytes.fromhex('00 35 ff 00 0c'))
             self.assertEqual(device.config[:2]+device.config[3:5]+device.config[10:],before[:2]+before[3:5]+before[10:])
-            self.assertEqual(result['color_preset'],'Verde')
+            self.assertEqual(result['color_preset'],'Green')
 
     def test_native_rainbow_uses_captured_configuration(self):
         device=SimulatedKeyboard()
         with tempfile.TemporaryDirectory() as folder, patch.object(app,'ROOT',Path(folder)), patch.object(app,'Device',lambda:device):
-            result=app.apply_native_brightness(9,color_preset='Arco-íris')
+            result=app.apply_native_brightness(9,color_preset='Rainbow')
             self.assertEqual(result['status'],'lighting_acknowledged')
             self.assertEqual(device.config[5:10],bytes.fromhex('ff ff 01 00 00'))
 
@@ -110,7 +110,7 @@ class OperationTests(unittest.TestCase):
             self.assertEqual(device.config[:2],before[:2])
             self.assertEqual(device.config[2],9)
             self.assertEqual(device.config[3:],before[3:])
-            backups=list(Path(folder).glob('luz-antes-*.json'))
+            backups=list(Path(folder).glob('light-before-*.json'))
             self.assertEqual(len(backups),1)
             self.assertEqual(json.loads(backups[0].read_text())['configuration_before'],before.hex())
 
@@ -132,7 +132,7 @@ class OperationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.object(app,'ROOT',Path(folder)), patch.object(app,'Device',lambda:device):
             result=app.apply_native_brightness(3)
             self.assertEqual(result['status'],'error')
-            self.assertIn('confirmado',result['message'])
+            self.assertIn('confirmed',result['message'])
 
     def test_lighting_capture_only_reads_and_compares_non_clock_fields(self):
         device=SimulatedKeyboard()
@@ -146,7 +146,7 @@ class OperationTests(unittest.TestCase):
             self.assertEqual(second['candidate_changes'],[{'offset':2,'before':2,'after':90}])
             self.assertEqual(second['clock_changes'],[{'offset':35,'before':35,'after':20}])
             self.assertEqual(device.commands,[])
-            self.assertEqual(len(list((Path(folder)/'registros-iluminacao').glob('*.json'))),2)
+            self.assertEqual(len(list((Path(folder)/'logs-lighting').glob('*.json'))),2)
 
     def test_clock_preserves_frame_counts_and_saves_backup_before_writing(self):
         device=SimulatedKeyboard()
@@ -155,7 +155,7 @@ class OperationTests(unittest.TestCase):
             self.assertEqual(result['status'],'configuration_acknowledged')
             self.assertEqual(device.commands,[1,6,2])
             self.assertEqual((device.config[34],device.config[46]),(34,46))
-            backups=list(Path(folder).glob('config-antes-*.json'))
+            backups=list(Path(folder).glob('config-before-*.json'))
             self.assertEqual(len(backups),1)
             self.assertEqual(json.loads(backups[0].read_text())['configuration_before'],bytes(range(48)).hex())
             self.assertTrue(device.closed)
@@ -168,6 +168,6 @@ class OperationTests(unittest.TestCase):
             result=app.send_photo([bytes(65536),bytes(65536)],lambda value:None,100)
             self.assertEqual(result['status'],'error')
             self.assertIn('Missing ACK',result['message'])
-            saved=json.loads((Path(folder)/'resultado-envio.json').read_text(encoding='utf-8'))
+            saved=json.loads((Path(folder)/'result-upload.json').read_text(encoding='utf-8'))
             self.assertEqual(saved['status'],'error')
             self.assertTrue(device.closed)

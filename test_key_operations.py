@@ -40,10 +40,10 @@ class KeyOperationTests(unittest.TestCase):
     def test_lighting_probe_does_not_depend_on_keymap_or_layer_count(self):
         device=Keyboard()
         def exchange(command,data=b'',prefix=None):
-            if command!=8: raise AssertionError('A consulta de luz não deve ler camadas ou teclas.')
+            if command!=8: raise AssertionError('The lighting query must not read layers or keys.')
             raise NotImplementedError('unsupported lighting')
         device.exchange=exchange
-        def layer_count(): raise AssertionError('A consulta de luz não deve ler camadas.')
+        def layer_count(): raise AssertionError('The lighting query must not read layers.')
         device.layer_count=layer_count
         with tempfile.TemporaryDirectory() as folder,patch.object(app,'ROOT',Path(folder)),patch.object(app,'ViaDevice',lambda:device),patch.object(app,'read_native_lighting',lambda:None):
             result=probe_lighting()
@@ -64,5 +64,5 @@ class KeyOperationTests(unittest.TestCase):
             result=write_key(0,0,0,4,5)
             self.assertEqual(result['status'],'key_acknowledged')
             self.assertEqual(device.commands,[0x12,5,0x12])
-            self.assertTrue((Path(folder)/'ultima-tecla.json').exists())
+            self.assertTrue((Path(folder)/'last-key.json').exists())
             self.assertEqual(result['old'],4);self.assertEqual(result['new'],5)
