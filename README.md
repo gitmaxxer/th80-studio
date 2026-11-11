@@ -97,7 +97,7 @@ Source: [EPOMAKER's official manual](https://epomaker.com/blogs/manuals/th80-pro
 
 The app selects the product **EPOMAKER TH80 Pro V2**, VID `320F`, PID `5055`, on specific HID interfaces. Similar IDs on another model don't guarantee compatibility. Connect only one keyboard of this model at a time.
 
-If the keyboard isn't found, check the cable and the switch position, and close other configurators. Bluetooth and the 2.4 GHz receiver are not supported in this version. The code avoids reset, bootloader and firmware commands; it doesn't require disabling Windows protections or removing drivers.
+If the keyboard isn't found, check the cable and the switch position, and close other configurators. Bluetooth and the 2.4 GHz receiver are not supported in this version. To test whether they could be, see [WIRELESS.md](WIRELESS.md) and `wireless_probe.py`. The code avoids reset, bootloader and firmware commands; it doesn't require disabling Windows protections or removing drivers.
 
 Results and configuration backups are written locally to `result-*.json`, `*-before-*.json` and the `logs-*` folders. Git ignores them. The app does not send them to any telemetry service. Review the logs before attaching them to an issue.
 
@@ -118,6 +118,7 @@ The tests exercise USB packets, transfers, animations, the clock, the VIA keymap
 | `media.py` | Image and GIF preparation |
 | `color_wheel.py`, `lighting_catalog.py` | RGB selection and observed catalog |
 | `manual.py` | Built-in guide |
+| `wireless_probe.py` | Read-only test of the private channels over 2.4 GHz and Bluetooth |
 
 Contributions are welcome: tests on more units, effect mapping, Windows packaging and validated macOS/Linux support. Include the exact model, OS, steps and expected result when opening an issue.
 
